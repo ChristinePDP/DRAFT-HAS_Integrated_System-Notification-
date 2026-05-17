@@ -203,21 +203,21 @@ export const getNotificationLogs = async (req, res) => {
       query.recipientEmail = 'unauthorized_access'; 
     } 
     // GROUP 5 (Patient Portal): Patients can only view their own emails
-    else if (user.role === 'Patient') {
+    else if (user.role?.toLowerCase() === 'patient') {
       if (!user.email) {
         return res.status(400).json({ success: false, message: "Token payload missing 'email' for patient validation." });
       }
       query.recipientEmail = user.email.toLowerCase();
     } 
     // GROUP 6 (Doctor Portal): Doctors can ONLY view logs they personally sent
-    else if (user.role === 'Doctor') {
+    else if (user.role?.toLowerCase() === 'doctor') {
       if (!user.email) {
         return res.status(400).json({ success: false, message: "Token payload missing 'email' for doctor validation." });
       }
       query.senderEmail = user.email.toLowerCase();
     } 
     // ADMIN ROLE: Unrestricted access. Allowed to fetch all logs or search by specific recipient
-    else if (user.role === 'Admin') {
+    else if (user.role?.toLowerCase() === 'admin') {
       if (req.query.recipientEmail) {
         query.recipientEmail = req.query.recipientEmail.toLowerCase();
       }
