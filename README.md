@@ -2,7 +2,7 @@
 
 Base URL
 --------
-https://has-notif.onrender.com
+https://notification-lrqp.onrender.com
 
 Authentication
 --------------
@@ -21,14 +21,14 @@ Endpoints
 
 GET /api/health
 - Method: GET
-- URL: https://has-notif.onrender.com/api/health
+- URL: https://notification-lrqp.onrender.com/api/health
 - Headers: none
 - Example response (200):
   { "success": true, "message": "Notification service is running", "timestamp": "2026-05-17T12:00:00.000Z" }
 
 POST /api/notify
 - Method: POST
-- URL: https://has-notif.onrender.com/api/notify
+- URL: https://notification-lrqp.onrender.com/api/notify
 - Required headers:
   - Authorization: Bearer <token>
   - Content-Type: application/json
@@ -44,7 +44,7 @@ POST /api/notify
 
 GET /api/notification-logs
 - Method: GET
-- URL: https://has-notif.onrender.com/api/notification-logs
+- URL: https://notification-lrqp.onrender.com/api/notification-logs
 - Required headers:
   - Authorization: Bearer <token>
 - Query params (optional): `page` (default 1), `limit` (default 20), `status` (Sent|Failed|Duplicate), `recipientEmail` (admin only)
