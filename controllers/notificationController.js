@@ -3,50 +3,65 @@ import { sendEmail } from '../config/mailer.js';
 
 /**
  * Process Notification Controller
- * * Handles incoming notification requests from other microservices.
+ * 
+ * Handles incoming notification requests forwarded by the Adapter Layer (Group 2).
+ * The Adapter Layer is the ONLY external actor that directly calls this endpoint,
+ * routing requests from various microservices (Appointment System, Queue System, etc.)
+ * on their behalf.
+ * 
  * Implements duplicate detection, email sending, and database logging.
  * 
- *  * Request body format:
+ * Request body format (forwarded by Adapter Layer):
  * {
- *   "senderSystem": "string",
+ *   "senderSystem": "string" (optional - original sender's name, e.g., "Appointment System"),
  *   "recipientEmail": "string",
  *   "subject": "string",
  *   "message": "string"
  * }
  * 
+ * If senderSystem is not provided, it will be auto-detected from the JWT token's role.
  */
 export const processNotification = async (req, res) => {
   try {
     // Step 1: Extract and validate request body
-    const { recipientEmail, subject, message } = req.body;
+    // Note: The Adapter Layer forwards the request on behalf of the original sender
+    const { senderSystem: providedSenderSystem, recipientEmail, subject, message } = req.body;
 
-    // Validate required fields (senderSystem is no longer required from the client)
+    // Validate required fields
     if (!recipientEmail || !subject || !message) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields',
+        message: 'Adapter Layer: Missing required fields in forwarded request',
         code: 'MISSING_FIELDS',
         required: ['recipientEmail', 'subject', 'message'],
         received: { recipientEmail, subject, message },
       });
     }
 
-    // AUTO-DETECT SENDER SYSTEM FROM TOKEN
+    // DETERMINE SENDER SYSTEM
+    // Priority: Use senderSystem if provided by Adapter Layer, otherwise auto-detect from token
     let senderSystem = 'Unknown System';
-    if (req.user && req.user.role) {
-        const role = req.user.role;
-        if (role === 'Doctor') senderSystem = 'Doctor Portal';
-        else if (role === 'Patient') senderSystem = 'Patient Portal';
-        else if (role === 'Admin') senderSystem = 'Admin System';
-        else senderSystem = `${role} System`;
+    
+    if (providedSenderSystem && providedSenderSystem.trim()) {
+      // Use the sender system explicitly passed by the Adapter Layer
+      senderSystem = providedSenderSystem;
+      console.log(`[Adapter Layer] Using provided sender system: ${senderSystem}`);
+    } else if (req.user && req.user.role) {
+      // Fall back to auto-detection based on JWT role
+      const role = req.user.role;
+      if (role === 'Doctor') senderSystem = 'Doctor Portal';
+      else if (role === 'Patient') senderSystem = 'Patient Portal';
+      else if (role === 'Admin') senderSystem = 'Admin System';
+      else senderSystem = `${role} System`;
+      console.log(`[Adapter Layer] Auto-detected sender system from token role: ${senderSystem}`);
     }
 
-    // Additional validation: check if email is valid format
+    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(recipientEmail)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid email format',
+        message: 'Adapter Layer: Invalid email format in forwarded request',
         code: 'INVALID_EMAIL',
         recipientEmail,
       });
@@ -74,15 +89,16 @@ export const processNotification = async (req, res) => {
       });
 
       console.log(
-        `⚠ Duplicate notification detected for ${recipientEmail}. Original sent at ${duplicateRecord.createdAt}`
+        `[Adapter Layer] ⚠ Duplicate notification detected for ${recipientEmail}. Original sent at ${duplicateRecord.createdAt}`
       );
 
       return res.status(409).json({
         success: false,
-        message: 'Duplicate notification. This exact message was sent to this recipient within the last 5 minutes.',
+        message: 'Adapter Layer: Duplicate notification detected. This exact message was already sent to this recipient within the last 5 minutes.',
         code: 'DUPLICATE_NOTIFICATION',
         originalNotificationTime: duplicateRecord.createdAt,
         recipientEmail,
+        senderSystem,
       });
     }
 
@@ -93,9 +109,10 @@ export const processNotification = async (req, res) => {
     try {
       await sendEmail(recipientEmail, subject, message);
       emailSent = true;
+      console.log(`[Adapter Layer] ✅ Email sent successfully via ${senderSystem} to ${recipientEmail}`);
     } catch (error) {
       sendEmailError = error.message;
-      console.error('Email sending failed:', sendEmailError);
+      console.error(`[Adapter Layer] ❌ Email sending failed for ${senderSystem}:`, sendEmailError);
     }
 
     // Step 4: Save notification log to MongoDB
@@ -109,34 +126,32 @@ export const processNotification = async (req, res) => {
       errorDetails: sendEmailError,
     });
 
-    // If email failed, return error response
+    // If email failed, return error response to Adapter Layer
     if (!emailSent) {
       return res.status(500).json({
         success: false,
-        message: 'Failed to send notification email',
+        message: 'Adapter Layer: Failed to send notification email on behalf of sender system',
         code: 'EMAIL_SEND_FAILED',
+        senderSystem,
         details: sendEmailError,
         logId: notificationLog._id,
       });
     }
 
-    // Step 5: Mock Legacy System Update
-    // (Adapter Layer integration logic will go here if needed)
-
-    // Step 6: Return success response
+    // Step 5: Return success response to Adapter Layer
     return res.status(200).json({
       success: true,
-      message: 'Notification processed successfully',
+      message: 'Adapter Layer: Notification forwarded and sent successfully',
       code: 'NOTIFICATION_SENT',
       data: {
         logId: notificationLog._id,
+        senderSystem,
         recipientEmail,
         sentAt: notificationLog.createdAt,
-        senderSystem,
       },
     });
   } catch (error) {
-    console.error('Unexpected error in processNotification:', error);
+    console.error('[Adapter Layer] Unexpected error in processNotification:', error);
 
     // Attempt to save error log to database
     try {
