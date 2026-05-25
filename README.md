@@ -1,6 +1,6 @@
 
 # Notification System — Quick Guide
-
+#DAPAT TOTOONG EMAIL ANG GAGAMITIN SA PAG SEND NG NOTIFICATION PARA MARECIEVE THRU GMAIL
 ## Base URL
 `https://notification-lrqp.onrender.com`
 
