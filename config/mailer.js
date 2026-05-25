@@ -5,14 +5,11 @@ import 'dotenv/config';
 
 // GMAIL CONFIGURATION
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // true para sa port 465 (SSL)
+  service: process.env.NODEMAILER_SERVICE || 'gmail',
   auth: {
     user: process.env.NODEMAILER_USER,
     pass: process.env.NODEMAILER_PASS,
   },
-  connectionTimeout: 10000, // 10 seconds timeout para hindi mag-hang ng 2 mins kung sakaling i-block pa rin
 });
 
 export const sendEmail = async (to, subject, text) => {
